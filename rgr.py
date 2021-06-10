@@ -8,13 +8,13 @@ class Task:
 		self.To = To
 		self.Td = Td
 		self.progress = 0
-
+		self.interruptable = np.random.uniform() < 0.5
 
 	def __lt__(self, other):
 		return self.Tp < other.Tp
 
 	def __repr__(self):
-		return f'arrive_time: {self.Tp}, exec_time: {self.To}, deadline: {self.Td}\n'
+		return f'arrive_time: {self.Tp}, exec_time: {self.To}, deadline: {self.Td}, can be interrupted: {self.interruptable}\n'
 
 def Stream(tact_count, frequency, exec_time, k):
 	tasks = []
@@ -44,7 +44,7 @@ class Scheduler:
 		if not self.waiting_times:
 			return 0
 		return round(sum(self.waiting_times) / len(self.waiting_times))
-
+		
 	def get_downtime_percent(self):
 		return round(self.downtime / self.tact_count * 100, 2)
 
@@ -78,6 +78,7 @@ class Scheduler:
 			self.queue_sizes[tact] = len(queue)
 			if sorting_par:
 				queue.sort(key = attrgetter(sorting_par))
+			queue.sort(key = attrgetter('interruptable'))
 			for p in range(self.processor_count):
 				if not currentTasks[p]:
 					if not queue:
@@ -95,7 +96,7 @@ class Scheduler:
 					if not queue:
 						break
 					currentTasks[p] = queue.pop(0)
-				if sorting_par :
+				if sorting_par and currentTasks[p].interruptable:
 					if queue:
 						if getattr(queue[0], sorting_par) < getattr(currentTasks[p], sorting_par):
 							stream.insert(0, currentTasks[p])
@@ -115,7 +116,7 @@ class Scheduler:
 	def rm(self, stream):
 		print('-----EDF---------')
 		self.schedule(stream, 'To')
-
+		
 
 	def edf(self, stream):
 		print('-----RM---------')
@@ -131,13 +132,11 @@ def plot_waiting_time(schedule_func):
 		sch = Scheduler(100, 3)
 		getattr(sch, schedule_func)(t)
 		avg_waiting_times[λ] = round(sum(sch.waiting_times) / len(sch.waiting_times))
-	plt.plot(avg_waiting_times)
+	plt.plot(avg_waiting_times, label = schedule_func)
 	plt.xlim(1, 50)
 	plt.xlabel("λ")
 	plt.ylabel("Average waiting time")
 	plt.title("Залежність середнього часу очікування від інтенсивності вхідного потоку заявок")
-    plt.legend()
-    plt.show()
 
 def plot_downtime_percent(schedule_func):
 	downtime_percents = [0] * 50
@@ -149,13 +148,11 @@ def plot_downtime_percent(schedule_func):
 		sch = Scheduler(100, 3)
 		getattr(sch, schedule_func)(t)
 		downtime_percents[λ] = round(sch.downtime / sch.tact_count * 100, 2)
-	plt.plot(downtime_percents)
+	plt.plot(downtime_percents, label = schedule_func)
 	plt.xlim(1, 50)
 	plt.xlabel("λ")
 	plt.ylabel("Downtime percent")
 	plt.title("Залежність проценту простою ресурсу від інтенсивності вхідного потоку заявок")
-    plt.legend()
-    plt.show()
 
 def plot_task_count(schedule_func):
 	λ = 10
@@ -163,14 +160,13 @@ def plot_task_count(schedule_func):
 	t2 = Stream(100, λ, 5, 3)
 	t3 = Stream(100, λ, 20, 5)
 	t = t1 + t2 + t3
-	sch = Scheduler(100, 3)
+	sch = Scheduler(100, 2)
 	getattr(sch, schedule_func)(t)
 	waiting_times = dict((x,sch.waiting_times.count(x)) for x in set(sch.waiting_times))
-	plt.bar(range(len(waiting_times)), waiting_times.values())
+	plt.bar(range(len(waiting_times)), waiting_times.values(), label = schedule_func)
 	plt.xlabel("λ")
 	plt.ylabel("Average waiting time")
 	plt.title("Залежність кількості заявок від часу очікування")
-	plt.show()
 	sch.printCharacteristics()
 
 
@@ -178,15 +174,18 @@ def main():
 	plot_task_count('fifo')
 	plot_task_count('edf')
 	plot_task_count('rm')
-
+	plt.legend()
+	plt.show()
 
 	plot_waiting_time('fifo')
 	plot_waiting_time('edf')
 	plot_waiting_time('rm')
+	plt.legend()
+	plt.show()
 
-
-	plot_downtime_percent('fifo')
+	plot_downtime_percent('fifo')	
 	plot_downtime_percent('edf')
 	plot_downtime_percent('rm')
-
+	plt.legend()
+	plt.show()
 main()
